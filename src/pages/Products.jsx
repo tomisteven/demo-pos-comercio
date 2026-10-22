@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useContext, useCallback, useMemo, useRef } from 'react';
 import api from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
-import { PlusCircle, Search, Edit2, Trash2, X, PackagePlus, Plus, Minus, Download, CheckSquare, Square, ChevronDown, Sparkles, Loader, Puzzle, Trash, Eye, EyeOff } from 'lucide-react';
+import { PlusCircle, Search, Edit2, Trash2, X, PackagePlus, Plus, Minus, Download, CheckSquare, Square, ChevronDown, Sparkles, Loader, Puzzle, Trash, Eye, EyeOff, Tags, ScanBarcode, Camera, Barcode } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { exportProductsToExcel } from '../utils/exportProductsExcel';
+import { generateProductLabelsPdf } from '../utils/labelPdf';
+import BarcodeScannerModal from '../components/BarcodeScannerModal';
 
 const arsFormat = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' });
 const formatCurrency = (val) => arsFormat.format(val);
@@ -254,6 +256,7 @@ const Products = () => {
     nombre: '', descripcion: '', sku: '', codigoBarras: '', categoria: '', precioCompra: 0, precioVenta: 0,
     stock: 0, stockMinimo: 5, unidadMedida: 'unidad', proveedor: '', imagen: '',
     esGenerico: false,
+    esFraccionado: false, precioFraccionado: 0, precioBolsaCerrada: 0,
     notasIA: '', mostrarEnCatalogo: true
   });
 
@@ -282,6 +285,12 @@ const Products = () => {
   const [showBulkValueInput, setShowBulkValueInput] = useState(false);
   const [loadingBulk, setLoadingBulk] = useState(false);
   const [margenDefecto, setMargenDefecto] = useState(30);
+  const [storeName, setStoreName] = useState('MiniMarket');
+  const [generatingLabels, setGeneratingLabels] = useState(false);
+
+  // Escaneo de código de barras (lector físico + cámara)
+  const [showScanner, setShowScanner] = useState(false);
+  const barcodeRef = useRef(null);
 
   useEffect(() => {
     fetchCategories();
@@ -292,6 +301,7 @@ const Products = () => {
       .then(res => {
         const c = res.data?.config;
         if (c && c.margenGananciaDefecto) setMargenDefecto(c.margenGananciaDefecto);
+        if (c && c.nombreTienda) setStoreName(c.nombreTienda);
       })
       .catch(() => {});
   }, []);
@@ -344,8 +354,36 @@ const Products = () => {
       }
     }
 
+    // Al marcar "alimento fraccionado", precargar el precio fraccionado
+    // con el precio de venta actual si todavía no tiene valor.
+    if (name === 'esFraccionado' && checked && !(Number(formData.precioFraccionado) > 0)) {
+      next.precioFraccionado = Number(formData.precioVenta) || 0;
+    }
+
     setFormData(next);
   };
+
+  // Carga el código escaneado (lector físico USB o cámara) en el formulario.
+  const applyBarcode = useCallback((code) => {
+    const value = String(code || '').trim();
+    if (!value) return;
+    setFormData((prev) => ({ ...prev, codigoBarras: value }));
+  }, []);
+
+  // El lector físico envía el código + Enter como si fuera teclado.
+  const handleBarcodeKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      applyBarcode(formData.codigoBarras);
+      toast.success('Código de barras cargado');
+    }
+  };
+
+  const handleBarcodeDetected = useCallback((code) => {
+    applyBarcode(code);
+    setShowScanner(false);
+    toast.success('Código de barras escaneado');
+  }, [applyBarcode]);
 
   const openNewModal = () => {
     setEditingId(null);
@@ -354,6 +392,7 @@ const Products = () => {
       precioCompra: 0, precioVenta: 0, stock: 0, stockMinimo: 5,
       unidadMedida: 'unidad', proveedor: '', imagen: '',
       esGenerico: false,
+      esFraccionado: false, precioFraccionado: 0, precioBolsaCerrada: 0,
       notasIA: '', mostrarEnCatalogo: true
     });
     setIsModalOpen(true);
@@ -368,6 +407,9 @@ const Products = () => {
       stock: p.stock, stockMinimo: p.stockMinimo,
       unidadMedida: p.unidadMedida, proveedor: p.proveedor || '', imagen: p.imagen || '',
       esGenerico: p.esGenerico || false,
+      esFraccionado: p.esFraccionado || false,
+      precioFraccionado: p.precioFraccionado || 0,
+      precioBolsaCerrada: p.precioBolsaCerrada || 0,
       notasIA: p.notasIA || '',
       mostrarEnCatalogo: p.mostrarEnCatalogo !== false
     });
@@ -480,6 +522,19 @@ const Products = () => {
       toast.error(error?.response?.data?.message || error?.message || 'Error al exportar Excel');
     } finally {
       setExporting(false);
+    }
+  };
+
+  const generateLabels = async () => {
+    setGeneratingLabels(true);
+    try {
+      const { data } = await api.get('/products');
+      const result = await generateProductLabelsPdf({ products: data, storeName, copies: 1 });
+      toast.success(`PDF generado: ${result.total} etiquetas de ${result.productos} productos`);
+    } catch (error) {
+      toast.error(error?.message || 'Error al generar las etiquetas');
+    } finally {
+      setGeneratingLabels(false);
     }
   };
 
@@ -677,6 +732,15 @@ const Products = () => {
             >
               <Download size={18} className="mr-1 md:mr-2" />
               <span className="hidden sm:inline">{exporting ? 'Generando...' : 'Solo con precios'}</span>
+            </button>
+            <button
+              onClick={generateLabels}
+              disabled={generatingLabels}
+              className="bg-purple-600/10 hover:bg-purple-600/20 text-purple-300 px-3 md:px-4 py-2 rounded-lg transition-colors flex items-center border border-purple-600/30 shadow-sm whitespace-nowrap disabled:opacity-50"
+              title="Generar un PDF con etiquetas de precio de todos los productos (A4, 24 por hoja)"
+            >
+              {generatingLabels ? <Loader size={18} className="mr-1 md:mr-2 animate-spin" /> : <Tags size={18} className="mr-1 md:mr-2" />}
+              <span className="hidden sm:inline">{generatingLabels ? 'Generando...' : 'Etiquetas PDF'}</span>
             </button>
             <button
               onClick={() => setFilterOnlyCombos(!filterOnlyCombos)}
@@ -995,9 +1059,39 @@ onOpenEdit={openEditModal}
                   </div>
 
                  <div>
-                     <label className="block text-sm font-medium text-textMuted mb-2">Código de barras</label>
-                     <input name="codigoBarras" value={formData.codigoBarras} onChange={handleInputChange} type="text" placeholder="Ej: 7791234567890" className="w-full bg-background border border-stone-700 rounded-lg px-4 py-2 text-textLight focus:ring-1 focus:ring-primary focus:outline-none" />
-                     <p className="text-[10px] text-textMuted mt-1">Se puede escanear en el punto de venta</p>
+                     <label className="block text-sm font-medium text-textMuted mb-2 flex items-center gap-1.5">
+                       <Barcode size={14} /> Código de barras
+                     </label>
+                     <div className="flex gap-2">
+                       <div className="relative flex-1">
+                         <ScanBarcode className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" size={16} />
+                         <input
+                           ref={barcodeRef}
+                           name="codigoBarras"
+                           value={formData.codigoBarras}
+                           onChange={handleInputChange}
+                           onKeyDown={handleBarcodeKeyDown}
+                           autoFocus
+                           autoComplete="off"
+                           inputMode="numeric"
+                           type="text"
+                           placeholder="Escaneá o escribí el código"
+                           className="w-full bg-background border border-stone-700 rounded-lg pl-9 pr-3 py-2 text-textLight font-mono focus:ring-1 focus:ring-primary focus:outline-none"
+                         />
+                       </div>
+                       <button
+                         type="button"
+                         onClick={() => setShowScanner(true)}
+                         title="Escanear con la cámara"
+                         className="shrink-0 px-3 rounded-lg border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center gap-1.5"
+                       >
+                         <Camera size={16} />
+                         <span className="hidden sm:inline text-sm font-medium">Cámara</span>
+                       </button>
+                     </div>
+                     <p className="text-[10px] text-textMuted mt-1">
+                       Apuntá con el lector físico (se carga solo) o usá la cámara. También se escanea en el punto de venta.
+                     </p>
                   </div>
 
                  <div>
@@ -1026,7 +1120,31 @@ onOpenEdit={openEditModal}
                           <input type="checkbox" name="mostrarEnCatalogo" checked={formData.mostrarEnCatalogo !== false} onChange={handleInputChange} className="w-4 h-4 text-primary bg-stone-800 border-stone-600 rounded focus:ring-primary" />
                           <span className="text-sm text-textMuted">Mostrar en el catálogo online <span className="text-textMuted/60">(desmarcar para ocultarlo a los clientes web)</span></span>
                        </label>
+
+                       <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" name="esFraccionado" checked={formData.esFraccionado} onChange={handleInputChange} className="w-4 h-4 text-primary bg-stone-800 border-stone-600 rounded focus:ring-primary" />
+                          <span className="text-sm text-textMuted">Alimento fraccionado <span className="text-textMuted/60">(la etiqueta imprime precio fraccionado y precio de bolsa cerrada)</span></span>
+                       </label>
                     </div>
+
+                    {formData.esFraccionado && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-stone-700">
+                        <div>
+                          <label className="block text-sm font-medium text-textMuted mb-2">Precio fraccionado</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 font-bold">$</span>
+                            <input name="precioFraccionado" value={formData.precioFraccionado} onChange={handleInputChange} min="0" step="0.01" type="number" className="w-full bg-background border border-stone-700 rounded-lg pl-7 pr-4 py-2 text-textLight focus:ring-1 focus:ring-primary focus:outline-none" />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-textMuted mb-2">Precio bolsa cerrada</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 font-bold">$</span>
+                            <input name="precioBolsaCerrada" value={formData.precioBolsaCerrada} onChange={handleInputChange} min="0" step="0.01" type="number" className="w-full bg-background border border-stone-700 rounded-lg pl-7 pr-4 py-2 text-textLight focus:ring-1 focus:ring-primary focus:outline-none" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                  <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6 bg-stone-800/30 p-4 rounded-xl border border-stone-800">
@@ -1328,6 +1446,13 @@ onOpenEdit={openEditModal}
             </form>
           </div>
         </div>
+      )}
+
+      {showScanner && (
+        <BarcodeScannerModal
+          onDetected={handleBarcodeDetected}
+          onClose={() => setShowScanner(false)}
+        />
       )}
     </div>
   );
