@@ -20,12 +20,21 @@ const calculateMargin = (compra, venta) => {
   return (((venta - compra) / compra) * 100).toFixed(2);
 };
 
+const defaultQrBase = () => {
+  if (typeof window === 'undefined') return '';
+  try {
+    return localStorage.getItem('stocka_qr_base') || window.location.origin;
+  } catch {
+    return window.location.origin;
+  }
+};
+
 // Unidades de venta soportadas (el stock siempre se lleva por unidades)
 const UNIDADES_MEDIDA = [
   'unidad', 'paquete', 'caja', 'blister', 'botella', 'lata', 'bolsa', 'barra', 'pote', 'litro', 'docena'
 ];
 
-const ProductTableRow = React.memo(function ProductTableRow({ p, isSelected, isAdmin, onToggleSelect, onQuickAdjust, onOpenStock, onOpenEdit, onDelete, onToggleCatalogo }) {
+const ProductTableRow = React.memo(function ProductTableRow({ p, isSelected, isAdmin, onToggleSelect, onQuickAdjust, onOpenStock, onOpenEdit, onDelete, onToggleCatalogo, onPrintLabel }) {
   return (
     <tr className={`hover:bg-stone-800/50 transition-colors ${isSelected ? 'bg-primary/5 border-l-2 border-l-primary' : ''}`}>
       <td className="px-4 py-4">
@@ -77,6 +86,9 @@ const ProductTableRow = React.memo(function ProductTableRow({ p, isSelected, isA
       </td>
       <td className="px-4 py-4">
         <div className="flex items-center justify-center space-x-3">
+          {!p.esCombo && (
+            <button onClick={() => onPrintLabel(p)} className="text-purple-300 hover:text-purple-200" title="Imprimir etiqueta de este producto"><Tags size={16} /></button>
+          )}
           <button onClick={() => onOpenStock(p)} className="text-emerald-400 hover:text-emerald-300" title="Ajustar Stock"><PackagePlus size={16} /></button>
           <button onClick={() => onOpenEdit(p)} className="text-primary hover:text-primary/80" title="Editar"><Edit2 size={16} /></button>
           {isAdmin && (
@@ -93,7 +105,7 @@ const ProductTableRow = React.memo(function ProductTableRow({ p, isSelected, isA
   );
 });
 
-const ProductCardRow = React.memo(function ProductCardRow({ p, isSelected, isAdmin, onToggleSelect, onQuickAdjust, onOpenStock, onOpenEdit, onDelete, onToggleCatalogo }) {
+const ProductCardRow = React.memo(function ProductCardRow({ p, isSelected, isAdmin, onToggleSelect, onQuickAdjust, onOpenStock, onOpenEdit, onDelete, onToggleCatalogo, onPrintLabel }) {
   return (
     <div className={`p-4 transition-colors ${isSelected ? 'bg-primary/5' : ''}`}>
       <div className="flex items-start gap-3">
@@ -105,6 +117,9 @@ const ProductCardRow = React.memo(function ProductCardRow({ p, isSelected, isAdm
           <div className="flex items-start justify-between gap-2">
             <p className="font-medium text-textLight text-sm">{p.nombre}</p>
             <div className="flex items-center gap-2 shrink-0">
+              {!p.esCombo && (
+                <button onClick={() => onPrintLabel(p)} className="text-purple-300 hover:text-purple-200" title="Imprimir etiqueta de este producto"><Tags size={17} /></button>
+              )}
               <button onClick={() => onOpenStock(p)} className="text-emerald-400 hover:text-emerald-300" title="Ajustar Stock"><PackagePlus size={17} /></button>
               <button onClick={() => onOpenEdit(p)} className="text-primary hover:text-primary/80" title="Editar"><Edit2 size={17} /></button>
               {isAdmin && (
@@ -287,6 +302,15 @@ const Products = () => {
   const [margenDefecto, setMargenDefecto] = useState(30);
   const [storeName, setStoreName] = useState('MiniMarket');
   const [generatingLabels, setGeneratingLabels] = useState(false);
+  const [showLabelModal, setShowLabelModal] = useState(false);
+  const [labelScope, setLabelScope] = useState('todos');
+  const [labelProduct, setLabelProduct] = useState(null);
+  const [labelOptions, setLabelOptions] = useState(() => ({
+    includeBarcode: true,
+    includeQr: true,
+    copies: 1,
+    baseUrl: defaultQrBase(),
+  }));
 
   // Escaneo de código de barras (lector físico + cámara)
   const [showScanner, setShowScanner] = useState(false);
@@ -525,12 +549,49 @@ const Products = () => {
     }
   };
 
+  const openLabelModal = useCallback((opts = {}) => {
+    const producto = opts.product || null;
+    setLabelProduct(producto);
+    setLabelScope(producto ? 'producto' : (selectedIds.length > 0 ? 'seleccionados' : 'todos'));
+    setShowLabelModal(true);
+  }, [selectedIds]);
+
+  const openLabelForProduct = useCallback((p) => openLabelModal({ product: p }), [openLabelModal]);
+
   const generateLabels = async () => {
+    let objetivo = products;
+    if (labelScope === 'producto') objetivo = labelProduct ? [labelProduct] : [];
+    else if (labelScope === 'seleccionados') objetivo = products.filter((p) => selectedIds.includes(p._id));
+
+    if (!objetivo.length) {
+      toast.error('No hay productos para etiquetar');
+      return;
+    }
+
+    const base = String(labelOptions.baseUrl || '').trim().replace(/\/+$/, '');
+    if (labelOptions.includeQr && !/^https?:\/\/.+/i.test(base)) {
+      toast.error('Ingresá una URL pública válida para el QR (ej: https://tu-sitio.netlify.app)');
+      return;
+    }
+
     setGeneratingLabels(true);
     try {
-      const { data } = await api.get('/products');
-      const result = await generateProductLabelsPdf({ products: data, storeName, copies: 1 });
-      toast.success(`PDF generado: ${result.total} etiquetas de ${result.productos} productos`);
+      if (labelOptions.includeQr) {
+        try { localStorage.setItem('stocka_qr_base', base); } catch { /* sin storage */ }
+      }
+      const result = await generateProductLabelsPdf({
+        products: objetivo,
+        storeName,
+        copies: labelOptions.copies,
+        includeBarcode: labelOptions.includeBarcode,
+        includeQr: labelOptions.includeQr,
+        publicBaseUrl: base,
+      });
+      toast.success(
+        `PDF generado: ${result.total} etiqueta(s) de ${result.productos} producto(s)`
+        + (result.conQr ? ` · ${result.conQr} con QR` : '')
+      );
+      setShowLabelModal(false);
     } catch (error) {
       toast.error(error?.message || 'Error al generar las etiquetas');
     } finally {
@@ -734,10 +795,10 @@ const Products = () => {
               <span className="hidden sm:inline">{exporting ? 'Generando...' : 'Solo con precios'}</span>
             </button>
             <button
-              onClick={generateLabels}
+              onClick={() => openLabelModal()}
               disabled={generatingLabels}
               className="bg-purple-600/10 hover:bg-purple-600/20 text-purple-300 px-3 md:px-4 py-2 rounded-lg transition-colors flex items-center border border-purple-600/30 shadow-sm whitespace-nowrap disabled:opacity-50"
-              title="Generar un PDF con etiquetas de precio de todos los productos (A4, 24 por hoja)"
+              title="Imprimir etiquetas de precio (podés elegir todos, seleccionados o uno solo)"
             >
               {generatingLabels ? <Loader size={18} className="mr-1 md:mr-2 animate-spin" /> : <Tags size={18} className="mr-1 md:mr-2" />}
               <span className="hidden sm:inline">{generatingLabels ? 'Generando...' : 'Etiquetas PDF'}</span>
@@ -966,6 +1027,7 @@ const Products = () => {
 onOpenEdit={openEditModal}
                       onDelete={handleDelete}
                       onToggleCatalogo={toggleCatalogo}
+                      onPrintLabel={openLabelForProduct}
                     />
                 ))
               )}
@@ -994,6 +1056,7 @@ onOpenEdit={openEditModal}
                 onOpenEdit={openEditModal}
                 onDelete={handleDelete}
                 onToggleCatalogo={toggleCatalogo}
+                onPrintLabel={openLabelForProduct}
               />
             ))
           )}
@@ -1252,6 +1315,120 @@ onOpenEdit={openEditModal}
             <div className="p-6 border-t border-stone-800 flex justify-end gap-3 rounded-b-2xl shrink-0">
                <button onClick={() => setIsModalOpen(false)} className="px-6 py-2 rounded-lg border border-stone-700 text-textLight hover:bg-stone-800 transition-colors">Cancelar</button>
                <button type="submit" form="productForm" className="px-6 py-2 rounded-lg bg-primary hover:bg-primaryDark text-white font-semibold transition-colors shadow-lg shadow-primary/20">Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Etiquetas */}
+      {showLabelModal && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-surface w-full max-w-lg rounded-t-2xl md:rounded-2xl border border-stone-700 shadow-2xl flex flex-col max-h-[92dvh] md:max-h-[90vh]">
+            <div className="flex justify-between items-center p-6 border-b border-stone-800">
+              <div>
+                <h3 className="text-xl font-bold text-textLight">Imprimir etiquetas</h3>
+                <p className="text-xs text-textMuted">Elegí qué productos y qué incluir.</p>
+              </div>
+              <button onClick={() => setShowLabelModal(false)} className="text-textMuted hover:text-textLight"><X size={24} /></button>
+            </div>
+
+            <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-5">
+              <div className="flex gap-3 bg-primary/10 border border-primary/20 rounded-xl px-4 py-3 text-xs text-textMuted">
+                <Tags size={16} className="text-primary shrink-0 mt-0.5" />
+                <p>El precio se imprime al generar el PDF. Con QR, el cliente puede escanear la etiqueta y ver el precio vigente sin volver a imprimir.</p>
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-textLight mb-2">Productos a etiquetar</p>
+                {labelProduct ? (
+                  <div className="rounded-xl border border-purple-600/30 bg-purple-600/10 px-4 py-3">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-purple-300">Solo este producto</p>
+                    <p className="text-sm font-semibold text-textLight truncate">{labelProduct.nombre}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedIds.length > 0 && (
+                      <label className={`flex items-center gap-3 rounded-xl border px-4 py-3 cursor-pointer ${labelScope === 'seleccionados' ? 'border-primary bg-primary/10' : 'border-stone-700 hover:border-stone-500'}`}>
+                        <input type="radio" name="labelScope" value="seleccionados" checked={labelScope === 'seleccionados'} onChange={() => setLabelScope('seleccionados')} className="accent-primary" />
+                        <span className="text-sm text-textLight">Seleccionados <span className="text-textMuted">({selectedIds.length})</span></span>
+                      </label>
+                    )}
+                    <label className={`flex items-center gap-3 rounded-xl border px-4 py-3 cursor-pointer ${labelScope === 'todos' ? 'border-primary bg-primary/10' : 'border-stone-700 hover:border-stone-500'}`}>
+                      <input type="radio" name="labelScope" value="todos" checked={labelScope === 'todos'} onChange={() => setLabelScope('todos')} className="accent-primary" />
+                      <span className="text-sm text-textLight">Todos los productos <span className="text-textMuted">({products.length})</span></span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-textLight">Copias por producto</p>
+                  <p className="text-[11px] text-textMuted">Del 1 al 50.</p>
+                </div>
+                <input
+                  type="number" min="1" max="50"
+                  value={labelOptions.copies}
+                  onChange={(e) => setLabelOptions((o) => ({ ...o, copies: Math.max(1, Math.min(50, parseInt(e.target.value) || 1)) }))}
+                  className="w-24 bg-background border border-stone-700 rounded-xl px-3 py-2 text-center text-textLight focus:ring-1 focus:ring-primary focus:outline-none"
+                />
+              </div>
+
+              <label className="flex items-start gap-3 rounded-xl border border-stone-700 px-4 py-3 cursor-pointer hover:border-stone-500">
+                <input type="checkbox" checked={labelOptions.includeBarcode} onChange={(e) => setLabelOptions((o) => ({ ...o, includeBarcode: e.target.checked }))} className="mt-0.5 accent-primary" />
+                <span>
+                  <span className="block text-sm font-semibold text-textLight">Incluir código de barras</span>
+                  <span className="block text-[11px] text-textMuted">Desactivalo para una etiqueta solo con precio.</span>
+                </span>
+              </label>
+
+              <div className="rounded-xl border border-stone-700 px-4 py-3 space-y-3">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input type="checkbox" checked={labelOptions.includeQr} onChange={(e) => setLabelOptions((o) => ({ ...o, includeQr: e.target.checked }))} className="mt-0.5 accent-primary" />
+                  <span>
+                    <span className="block text-sm font-semibold text-textLight">Incluir QR con la ficha del producto</span>
+                    <span className="block text-[11px] text-textMuted">Al escanearlo, el cliente ve el precio actualizado.</span>
+                  </span>
+                </label>
+                {labelOptions.includeQr && (
+                  <div className="pl-7 space-y-2">
+                    <label className="block text-[11px] font-semibold text-textMuted">URL pública del catálogo</label>
+                    <input
+                      type="url"
+                      value={labelOptions.baseUrl}
+                      onChange={(e) => setLabelOptions((o) => ({ ...o, baseUrl: e.target.value }))}
+                      placeholder="https://tu-sitio.netlify.app"
+                      className="w-full bg-background border border-stone-700 rounded-lg px-3 py-2 text-xs text-textLight focus:ring-1 focus:ring-primary focus:outline-none"
+                    />
+                    <p className="text-[10px] text-textMuted leading-relaxed">
+                      El QR apunta a <span className="font-mono">/p/ID</span>. Usá la URL de tu sitio publicado; si imprimís desde localhost, cambiala por la URL de Netlify. Se guarda en este navegador.
+                    </p>
+                    {labelProduct && /^https?:\/\/.+/i.test(labelOptions.baseUrl.trim()) && (
+                      <a
+                        href={`${labelOptions.baseUrl.trim().replace(/\/+$/, '')}/p/${labelProduct._id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex text-[11px] font-semibold text-primary hover:underline"
+                      >
+                        Probar la ficha pública de este producto
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-4 sm:p-6 border-t border-stone-800 flex gap-3">
+              <button type="button" onClick={() => setShowLabelModal(false)} className="flex-1 py-3 rounded-lg border border-stone-700 text-textLight hover:bg-stone-800 transition-colors">Cancelar</button>
+              <button
+                type="button"
+                onClick={generateLabels}
+                disabled={generatingLabels}
+                className="flex-1 py-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-colors shadow-lg shadow-purple-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {generatingLabels ? <Loader size={18} className="animate-spin" /> : <Tags size={18} />}
+                {generatingLabels ? 'Generando...' : 'Generar PDF'}
+              </button>
             </div>
           </div>
         </div>

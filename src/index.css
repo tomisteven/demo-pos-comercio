@@ -52,3 +52,101 @@
     display: none !important;
   }
 }
+
+/* ============================================================
+   Catálogo público — paleta configurable
+   Las variables --cat-* se setean inline desde Catalogo.jsx.
+   ============================================================ */
+.catalogo-theme {
+  --cat-surface-2: color-mix(in srgb, var(--cat-surface) 95%, var(--cat-title) 5%);
+  --cat-border: color-mix(in srgb, var(--cat-surface) 93%, var(--cat-title) 7%);
+  --cat-border-strong: color-mix(in srgb, var(--cat-surface) 89%, var(--cat-title) 11%);
+  --cat-subtitle-soft: color-mix(in srgb, var(--cat-subtitle) 72%, var(--cat-bg) 28%);
+  --cat-accent-soft: color-mix(in srgb, var(--cat-accent) 16%, transparent);
+  --cat-accent-border: color-mix(in srgb, var(--cat-accent) 40%, transparent);
+  --cat-accent-border-strong: color-mix(in srgb, var(--cat-accent) 55%, transparent);
+  background-color: var(--cat-bg);
+  color: var(--cat-title);
+}
+
+/* Estructura: fondos y bordes */
+.catalogo-theme .bg-\[\#0f0f0f\] { background-color: var(--cat-bg) !important; }
+.catalogo-theme .bg-\[\#161616\] { background-color: color-mix(in srgb, var(--cat-surface) 72%, var(--cat-bg) 28%) !important; }
+.catalogo-theme .bg-\[\#1a1a1a\] { background-color: var(--cat-surface) !important; }
+.catalogo-theme .bg-\[\#1a1a1a\]\/95 { background-color: color-mix(in srgb, var(--cat-surface) 95%, transparent) !important; }
+.catalogo-theme .bg-\[\#222\] { background-color: var(--cat-surface-2) !important; }
+.catalogo-theme .bg-\[\#2a2a2a\] { background-color: var(--cat-surface-2) !important; }
+.catalogo-theme .hover\:bg-\[\#333\]:hover { background-color: var(--cat-border-strong) !important; }
+.catalogo-theme .border-\[\#222\],
+.catalogo-theme .border-\[\#242424\],
+.catalogo-theme .border-\[\#2a2a2a\],
+.catalogo-theme .border-\[\#333\] { border-color: var(--cat-border) !important; }
+
+/* Textos por rol */
+.catalogo-theme .text-white,
+.catalogo-theme .text-neutral-200 { color: var(--cat-title) !important; }
+.catalogo-theme .text-neutral-300,
+.catalogo-theme .text-neutral-400,
+.catalogo-theme .text-neutral-500 { color: var(--cat-subtitle) !important; }
+.catalogo-theme .text-neutral-600 { color: var(--cat-subtitle-soft) !important; }
+.catalogo-theme .placeholder-neutral-500::placeholder { color: var(--cat-subtitle-soft) !important; }
+
+/* Roles semánticos (van después de los genéricos para ganar prioridad) */
+.catalogo-theme .cat-product { color: var(--cat-product) !important; }
+.catalogo-theme .cat-desc { color: var(--cat-desc) !important; }
+.catalogo-theme .cat-category { color: var(--cat-category) !important; }
+.catalogo-theme .cat-price { color: var(--cat-price) !important; }
+
+/* Acento */
+.catalogo-theme .text-orange-200 { color: color-mix(in srgb, var(--cat-on-accent) 72%, transparent) !important; }
+.catalogo-theme .text-orange-300,
+.catalogo-theme .text-orange-400,
+.catalogo-theme .text-orange-700 { color: var(--cat-accent) !important; }
+.catalogo-theme .hover\:text-orange-300:hover,
+.catalogo-theme .hover\:text-orange-400:hover { color: var(--cat-accent) !important; }
+.catalogo-theme .bg-orange-500,
+.catalogo-theme .bg-orange-700 { background-color: var(--cat-accent) !important; }
+.catalogo-theme .hover\:bg-orange-400:hover { background-color: color-mix(in srgb, var(--cat-accent) 88%, var(--cat-title) 12%) !important; }
+.catalogo-theme .bg-orange-400\/10,
+.catalogo-theme .bg-orange-400\/20,
+.catalogo-theme .bg-orange-500\/10,
+.catalogo-theme .bg-orange-900\/30 { background-color: var(--cat-accent-soft) !important; }
+.catalogo-theme .hover\:bg-orange-500\/20:hover { background-color: var(--cat-accent-soft) !important; }
+.catalogo-theme .border-orange-500\/20,
+.catalogo-theme .border-orange-500\/30 { border-color: var(--cat-accent-border) !important; }
+.catalogo-theme .hover\:border-orange-500\/40:hover,
+.catalogo-theme .hover\:border-orange-500\/50:hover { border-color: var(--cat-accent-border-strong) !important; }
+.catalogo-theme .focus\:border-orange-500:focus { border-color: var(--cat-accent) !important; }
+.catalogo-theme .focus\:ring-orange-500\/40:focus { --tw-ring-color: var(--cat-accent-border) !important; }
+
+/* Texto legible sobre el color de acento */
+.catalogo-theme .bg-orange-500,
+.catalogo-theme .bg-orange-700,
+.catalogo-theme .bg-orange-500.text-white,
+.catalogo-theme .bg-orange-700.text-white,
+.catalogo-theme .bg-orange-500 .text-white,
+.catalogo-theme .bg-orange-700 .text-white,
+.catalogo-theme .bg-orange-500 .text-orange-200,
+.catalogo-theme .bg-orange-700 .text-orange-200 { color: var(--cat-on-accent) !important; }
+
+/* Gradientes */
+.catalogo-theme .bg-gradient-to-br.from-orange-400.to-orange-600 {
+  background-image: linear-gradient(to bottom right, color-mix(in srgb, var(--cat-accent) 82%, #fff 18%), var(--cat-accent)) !important;
+}
+.catalogo-theme .bg-gradient-to-br.from-orange-600.to-amber-500 {
+  background-image: linear-gradient(to bottom right, var(--cat-accent), color-mix(in srgb, var(--cat-accent) 65%, #000 35%)) !important;
+}
+
+/* Texto sobre imágenes/overlays: se mantiene claro siempre */
+.catalogo-theme .catalogo-on-media .text-white,
+.catalogo-theme .catalogo-on-media.text-white { color: #ffffff !important; }
+.catalogo-theme .bg-gradient-to-br.from-orange-600.to-amber-500 .text-white,
+.catalogo-theme .bg-gradient-to-br.from-orange-400.to-orange-600 .text-white { color: var(--cat-on-accent) !important; }
+.catalogo-theme .bg-gradient-to-br.from-orange-600.to-amber-500 .text-white\/85 {
+  color: color-mix(in srgb, var(--cat-on-accent) 85%, transparent) !important;
+}
+
+/* Elementos del chat que usan fondo oscuro fijo */
+.catalogo-theme .bg-\[\#333\] { background-color: var(--cat-border-strong) !important; }
+.catalogo-theme .bg-emerald-600.text-white,
+.catalogo-theme .bg-emerald-600 .text-white { color: #ffffff !important; }

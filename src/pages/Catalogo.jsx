@@ -6,6 +6,7 @@ import {
   Truck, ArrowRight, Sparkles, Heart, ShieldCheck, Store, Star
 } from 'lucide-react';
 import Chatbot from '../components/Chatbot';
+import { contrastText, ensureOn, mix } from '../utils/colors';
 
 const formatCurrency = (val) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(val);
 const unitLabel = (u) => (u && u !== 'unidad' ? u : '');
@@ -24,6 +25,15 @@ const STORE_DEFAULT = {
   pedidosTexto: 'Arma tu pedido en el catalogo y envialo por WhatsApp. Te confirmamos disponibilidad y formas de pago.',
   copyright: 'Precios sujetos a cambios sin previo aviso',
   hechoCon: 'Hecho con ♥ para tu barrio',
+  colorAcento: '#f97316',
+  colorFondo: '#0f0f0f',
+  colorSuperficie: '#1a1a1a',
+  colorTexto: '#ffffff',
+  colorProducto: '#ffffff',
+  colorSubtitulo: '#a3a3a3',
+  colorDescripcion: '#a3a3a3',
+  colorCategoria: '#a3a3a3',
+  colorPrecio: '#ffffff',
 };
 
 const BANNERS = [
@@ -132,7 +142,7 @@ const ProductCard = ({ p, cart, onAdd, onUpdate, onRemove, lista = false }) => {
     const btnAdd = `${btn} bg-orange-500 hover:bg-orange-400 text-white`;
 
     const precioLinea = (valor, sufijo) => (
-      <p className="text-sm font-bold text-white whitespace-nowrap">
+      <p className="cat-price text-sm font-bold text-white whitespace-nowrap">
         {formatCurrency(valor)}
         {sufijo && <span className="text-xs font-normal text-neutral-500 ml-1">{sufijo}</span>}
       </p>
@@ -172,16 +182,19 @@ const ProductCard = ({ p, cart, onAdd, onUpdate, onRemove, lista = false }) => {
             )}
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <h3 className="text-sm font-semibold text-white leading-snug break-words">{p.nombre}</h3>
+                <h3 className="cat-product text-sm font-semibold text-white leading-snug break-words">{p.nombre}</h3>
                 {p.categoria && (
                   <span
-                    className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md"
+                    className="cat-category shrink-0 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md"
                     style={{
-                      backgroundColor: p.categoria.color ? `${p.categoria.color}30` : 'rgba(0,0,0,0.5)',
-                      color: p.categoria.color || '#ccc',
-                      border: `1px solid ${p.categoria.color ? `${p.categoria.color}40` : 'rgba(255,255,255,0.1)'}`,
+                      backgroundColor: 'var(--cat-surface-2)',
+                      border: `1px solid ${p.categoria.color ? `${p.categoria.color}66` : 'var(--cat-border)'}`,
                     }}
                   >
+                    <span
+                      className="w-1.5 h-1.5 rounded-full shrink-0"
+                      style={{ backgroundColor: p.categoria.color || 'var(--cat-category)' }}
+                    />
                     {p.categoria.nombre}
                   </span>
                 )}
@@ -194,7 +207,7 @@ const ProductCard = ({ p, cart, onAdd, onUpdate, onRemove, lista = false }) => {
               )}
               {desc && (
                 <div className="mt-0.5">
-                  <p className={`text-xs text-neutral-400 leading-relaxed ${descOpen ? '' : 'line-clamp-1'}`}>
+                  <p className={`cat-desc text-xs text-neutral-400 leading-relaxed ${descOpen ? '' : 'line-clamp-1'}`}>
                     {desc}
                   </p>
                   <button
@@ -238,13 +251,16 @@ const ProductCard = ({ p, cart, onAdd, onUpdate, onRemove, lista = false }) => {
         <div className="absolute top-3 left-3 flex flex-col gap-1.5">
           {p.categoria && (
             <span
-              className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md backdrop-blur-sm"
+              className="cat-category inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md"
               style={{
-                backgroundColor: p.categoria.color ? `${p.categoria.color}30` : 'rgba(0,0,0,0.5)',
-                color: p.categoria.color || '#ccc',
-                border: `1px solid ${p.categoria.color ? `${p.categoria.color}40` : 'rgba(255,255,255,0.1)'}`,
+                backgroundColor: 'var(--cat-surface-2)',
+                border: `1px solid ${p.categoria.color ? `${p.categoria.color}66` : 'var(--cat-border)'}`,
               }}
             >
+              <span
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{ backgroundColor: p.categoria.color || 'var(--cat-category)' }}
+              />
               {p.categoria.nombre}
             </span>
           )}
@@ -265,16 +281,16 @@ const ProductCard = ({ p, cart, onAdd, onUpdate, onRemove, lista = false }) => {
 
       {/* Info */}
       <div className="p-4 flex flex-col flex-1">
-        <h3 className="text-sm font-semibold text-white leading-snug mb-1 line-clamp-2 min-h-[2.5rem]">
+        <h3 className="cat-product text-sm font-semibold text-white leading-snug mb-1 line-clamp-2 min-h-[2.5rem]">
           {p.nombre}
         </h3>
 
         {p.descripcion && (
-          <p className="text-xs text-neutral-500 leading-relaxed mb-3 line-clamp-2">{p.descripcion}</p>
+          <p className="cat-desc text-xs text-neutral-500 leading-relaxed mb-3 line-clamp-2">{p.descripcion}</p>
         )}
 
         <div className="mt-auto">
-          <p className="text-lg font-bold text-white mb-3">
+          <p className="cat-price text-lg font-bold text-white mb-3">
             {formatCurrency(p.precioVenta)}
             {unitLabel(p.unidadMedida) && (
               <span className="text-xs font-normal text-neutral-500 ml-1">por {p.unidadMedida}</span>
@@ -345,6 +361,15 @@ const Catalogo = () => {
           pedidosTexto: data.footerPedidosTexto ?? s.pedidosTexto,
           copyright: data.footerCopyright ?? s.copyright,
           hechoCon: data.footerHechoCon ?? s.hechoCon,
+          colorAcento: data.catalogoColorAcento ?? s.colorAcento,
+          colorFondo: data.catalogoColorFondo ?? s.colorFondo,
+          colorSuperficie: data.catalogoColorSuperficie ?? s.colorSuperficie,
+          colorTexto: data.catalogoColorTexto ?? s.colorTexto,
+          colorProducto: data.catalogoColorProducto ?? s.colorProducto,
+          colorSubtitulo: data.catalogoColorSubtitulo ?? s.colorSubtitulo,
+          colorDescripcion: data.catalogoColorDescripcion ?? s.colorDescripcion,
+          colorCategoria: data.catalogoColorCategoria ?? s.colorCategoria,
+          colorPrecio: data.catalogoColorPrecio ?? s.colorPrecio,
         }));
         if (data.catalogoTitulo) setBannerTitulo(data.catalogoTitulo);
         setBenefits((bs) => bs.map((b, i) => {
@@ -570,8 +595,31 @@ const Catalogo = () => {
       .slice(0, 4);
   }, [products]);
 
+  const themeVars = useMemo(() => {
+    const surface = store.colorSuperficie;
+    const bg = store.colorFondo;
+    const surfaceAlt = mix(surface, bg, 0.28);
+    const on = (color, min) => ensureOn(color, [surface, surfaceAlt], min);
+    return {
+      '--cat-accent': store.colorAcento,
+      '--cat-bg': bg,
+      '--cat-surface': surface,
+      '--cat-title': on(store.colorTexto, 4.5),
+      '--cat-product': on(store.colorProducto, 4.5),
+      '--cat-subtitle': on(store.colorSubtitulo, 4),
+      '--cat-desc': on(store.colorDescripcion, 4),
+      '--cat-category': on(store.colorCategoria, 4),
+      '--cat-price': on(store.colorPrecio, 4.5),
+      '--cat-on-accent': contrastText(store.colorAcento),
+    };
+  }, [
+    store.colorAcento, store.colorFondo, store.colorSuperficie, store.colorTexto,
+    store.colorProducto, store.colorSubtitulo, store.colorDescripcion,
+    store.colorCategoria, store.colorPrecio,
+  ]);
+
   return (
-    <div className="min-h-screen bg-[#0f0f0f]">
+    <div className="catalogo-theme min-h-screen bg-[#0f0f0f]" style={themeVars}>
 
       {/* Franja superior */}
       <div className="bg-orange-700 text-white">
@@ -650,7 +698,7 @@ const Catalogo = () => {
                 <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-transparent" />
 
                 {/* Contenido */}
-                <div className="relative h-full flex items-center">
+                <div className="relative h-full flex items-center catalogo-on-media">
                   <div className="px-6 sm:px-10 md:px-14 max-w-xl">
                     <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider bg-white/15 text-white rounded-full px-3 py-1 mb-4 backdrop-blur-sm">
                       <Sparkles size={12} /> {b.etiqueta}
@@ -675,13 +723,13 @@ const Catalogo = () => {
           {/* Flechas */}
           <button
             onClick={() => setBanner((b) => (b - 1 + BANNERS.length) % BANNERS.length)}
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors backdrop-blur-sm"
+            className="catalogo-on-media absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors backdrop-blur-sm"
           >
             <ChevronLeft size={20} />
           </button>
           <button
             onClick={() => setBanner((b) => (b + 1) % BANNERS.length)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors backdrop-blur-sm"
+            className="catalogo-on-media absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors backdrop-blur-sm"
           >
             <ChevronRight size={20} />
           </button>
@@ -1015,7 +1063,7 @@ const Catalogo = () => {
                       <div key={item.key} className="flex items-center gap-3 py-3 border-b border-[#222] last:border-0">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-white leading-snug">{item.nombre}</p>
-                          <p className="text-xs text-neutral-500">{formatCurrency(item.precio)} / {unit}</p>
+                          <p className="cat-price text-xs text-neutral-500">{formatCurrency(item.precio)} / {unit}</p>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <button
@@ -1034,7 +1082,7 @@ const Catalogo = () => {
                             <Plus size={12} />
                           </button>
                         </div>
-                        <span className="text-sm font-bold text-white w-28 text-right">
+                        <span className="cat-price text-sm font-bold text-white w-28 text-right">
                           {formatCurrency(item.precio * item.cantidad)}
                         </span>
                         <button
@@ -1054,7 +1102,7 @@ const Catalogo = () => {
               <div className="border-t border-[#2a2a2a] px-6 py-4 space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-base font-semibold text-white">Total</span>
-                  <span className="text-xl font-bold text-white">{formatCurrency(cartTotal)}</span>
+                  <span className="cat-price text-xl font-bold text-white">{formatCurrency(cartTotal)}</span>
                 </div>
                 <button
                   onClick={() => { setShowCart(false); setShowOrderForm(true); }}
@@ -1121,13 +1169,13 @@ const Catalogo = () => {
                   return (
                     <div key={i.key} className="flex justify-between text-sm py-1">
                       <span className="text-neutral-300">{i.nombre} x{i.cantidad} {unit}</span>
-                      <span className="font-medium text-white">{formatCurrency(i.precio * i.cantidad)}</span>
+                      <span className="cat-price font-medium text-white">{formatCurrency(i.precio * i.cantidad)}</span>
                     </div>
                   );
                 })}
                 <div className="flex justify-between border-t border-[#333] mt-2 pt-2">
                   <span className="font-semibold text-white">Total</span>
-                  <span className="font-bold text-white">{formatCurrency(cartTotal)}</span>
+                  <span className="cat-price font-bold text-white">{formatCurrency(cartTotal)}</span>
                 </div>
               </div>
 
@@ -1157,7 +1205,7 @@ const Catalogo = () => {
               Numero: <span className="font-mono font-bold text-white">{orderSuccess.numero}</span>
             </p>
             <p className="text-sm text-neutral-400 mb-4">
-              Total: <span className="font-bold text-white">{formatCurrency(orderSuccess.total)}</span>
+              Total: <span className="cat-price font-bold text-white">{formatCurrency(orderSuccess.total)}</span>
             </p>
             {orderSuccess.clienteAsignado && (
               <p className="text-xs text-orange-400 bg-orange-400/10 border border-orange-500/20 rounded-lg px-3 py-2 mb-4">

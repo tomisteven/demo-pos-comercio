@@ -28,6 +28,7 @@ import Gastos from './pages/Gastos';
 import GastosFijos from './pages/GastosFijos';
 import Budgets from './pages/Budgets';
 import Catalogo from './pages/Catalogo';
+import ProductoPublico from './pages/ProductoPublico';
 import Promociones from './pages/Promociones';
 import Asistente from './pages/Asistente';
 import AIHistory from './pages/AIHistory';
@@ -39,6 +40,7 @@ import AnalisisVentas from './pages/AnalisisVentas';
 import PreguntarIA from './pages/PreguntarIA';
 import AnalizarProductos from './pages/AnalizarProductos';
 import Configuracion from './pages/Configuracion';
+import InformacionSistemaPos from './pages/InformacionSistemaPos';
 
 function App() {
   return (
@@ -58,6 +60,8 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/catalogo" element={<Catalogo />} />
+            <Route path="/p/:id" element={<ProductoPublico />} />
+            <Route path="/informacion-sistema-pos" element={<InformacionSistemaPos />} />
             <Route path="/analisis-ventas" element={<ProtectedRoute><AnalisisVentas /></ProtectedRoute>} />
 
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>

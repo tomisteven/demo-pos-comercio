@@ -7,7 +7,7 @@ import {
   PackageX, ShoppingBag, Clock, ArrowRight, Sparkles, ChevronRight,
   AlertCircle, Globe, Share2, BarChart3, Lock, X,
   Target, RefreshCw, ArrowUpRight, ArrowDownRight, Calculator, ReceiptText, Home, Wallet,
-  Users, Search, Phone, ChevronDown, ChevronUp
+  Users, Search, Phone, ChevronDown, ChevronUp, BookOpen
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -491,6 +491,10 @@ const Dashboard = () => {
           <Link to="/catalogo" target="_blank" className="bg-white/5 hover:bg-white/10 border border-stone-700/50 text-textLight px-4 py-2 rounded-xl transition-all flex items-center text-sm font-medium">
             <Globe size={16} className="mr-2 opacity-70" />
             Catalogo
+          </Link>
+          <Link to="/informacion-sistema-pos" target="_blank" className="bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/40 text-amber-300 px-4 py-2 rounded-xl transition-all flex items-center text-sm font-medium" title="Ver todo lo que incluye el sistema">
+            <BookOpen size={16} className="mr-2" />
+            Conocer el sistema
           </Link>
           <button onClick={handleShareCatalog} className="bg-white/5 hover:bg-white/10 border border-stone-700/50 text-textLight px-4 py-2 rounded-xl transition-all flex items-center text-sm font-medium" title="Compartir catálogo">
             <Share2 size={16} className="opacity-70" />

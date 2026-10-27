@@ -1,6 +1,8 @@
-import { useState, useContext, useMemo } from 'react';
+import { useState, useContext, useMemo, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import api from '../api/axios';
+import logoLight from '../assets/logo-stocka-light.png';
 import {
   LayoutDashboard, 
   ShoppingCart, 
@@ -30,13 +32,13 @@ import {
   Calendar,
   Award,
   Search,
-  Store,
   Clock,
   Bot,
   MessageSquare,
   Settings,
   Banknote,
-  Percent
+  Percent,
+  BookOpen
 } from 'lucide-react';
 
 const UPDATES = [
@@ -196,6 +198,7 @@ const buildMenuGroups = (isAdmin) => {
       items: [
         { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
         { name: 'Punto de Venta', path: '/pos', icon: ShoppingCart },
+        { name: 'Conocer el sistema', path: '/informacion-sistema-pos', icon: BookOpen, newTab: true },
       ],
     },
     {
@@ -271,6 +274,19 @@ const Layout = () => {
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [menuSearch, setMenuSearch] = useState('');
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const [nombreTienda, setNombreTienda] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    api.get('/system-config/public')
+      .then(({ data }) => {
+        if (alive) setNombreTienda(data?.nombreTienda || '');
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const menuGroups = useMemo(() => buildMenuGroups(user?.rol === 'admin'), [user?.rol]);
 
@@ -307,13 +323,22 @@ const Layout = () => {
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } md:translate-x-0 fixed md:relative z-40 ${sidebarExpanded ? 'md:w-64' : 'md:w-[76px]'} w-64 h-full bg-surface border-r border-stone-800 transition-[width,transform] duration-300 flex flex-col overflow-hidden`}
       >
-        <div className="h-[72px] flex items-center justify-center border-b border-stone-800 shrink-0">
-          {sidebarExpanded ? (
-            <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary to-beige bg-clip-text text-transparent whitespace-nowrap">POROTO MINIMARKET</h1>
-          ) : (
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-primaryDark flex items-center justify-center">
-              <Store size={20} className="text-white" />
+        <div className="h-[72px] flex items-center justify-center border-b border-stone-800 shrink-0 px-3">
+          {sidebarExpanded || sidebarOpen ? (
+            <div className="w-full text-center overflow-hidden">
+              <h1 className="text-lg md:text-xl font-extrabold tracking-tight leading-none text-textLight whitespace-nowrap">
+                Stocka<span className="text-primary">POS</span>
+              </h1>
+              <p className="text-[10px] uppercase tracking-[0.16em] text-textMuted truncate mt-1.5">
+                {nombreTienda || 'Mi comercio'}
+              </p>
             </div>
+          ) : (
+            <img
+              src={logoLight}
+              alt="STOCKA POS"
+              className="h-10 w-auto max-w-[52px] object-contain"
+            />
           )}
         </div>
         
@@ -349,6 +374,8 @@ const Layout = () => {
                     <Link
                       key={item.path}
                       to={item.path}
+                      target={item.newTab ? '_blank' : undefined}
+                      rel={item.newTab ? 'noopener noreferrer' : undefined}
                       onClick={() => setSidebarOpen(false)}
                       className={`flex items-center justify-start ${sidebarExpanded ? 'md:justify-start' : 'md:justify-center'} px-3 py-2 rounded-lg transition-colors group ${
                         isActive

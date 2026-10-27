@@ -5,9 +5,11 @@ import { getUiScale, applyUiScale } from '../utils/uiScale';
 import {
   Settings, Save, Target, TrendingUp, Award, Coins, RefreshCw, DollarSign, Wallet,
   Store, Type, Percent, Plus, Trash2, User, KeyRound, Power, Receipt, ALargeSmall,
-  MapPin, Phone, Mail, Clock, Camera, Globe, MessageCircle, PanelBottom
+  MapPin, Phone, Mail, Clock, Camera, Globe, MessageCircle, PanelBottom,
+  Palette, PaintBucket, Square, AlignLeft, Tag, BadgeDollarSign
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { contrastText, contrastRatio, ensureOn, isHexColor, mix, normalizeHex } from '../utils/colors';
 
 const fmt = (val) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(val || 0);
 
@@ -27,6 +29,78 @@ const TIENDA_INICIAL = {
   catalogoTextoPago: 'Efectivo, transferencia y tarjetas',
 };
 
+const COLORES_INICIALES = {
+  catalogoColorAcento: '#f97316',
+  catalogoColorFondo: '#0f0f0f',
+  catalogoColorSuperficie: '#1a1a1a',
+  catalogoColorTexto: '#ffffff',
+  catalogoColorProducto: '#ffffff',
+  catalogoColorSubtitulo: '#a3a3a3',
+  catalogoColorDescripcion: '#a3a3a3',
+  catalogoColorCategoria: '#a3a3a3',
+  catalogoColorPrecio: '#ffffff',
+};
+
+const CAMPOS_COLOR_BASE = [
+  { key: 'catalogoColorAcento', title: 'Color de acento', desc: 'Botones, enlaces y destacados.', icon: Palette },
+  { key: 'catalogoColorFondo', title: 'Fondo de la página', desc: 'Color general del catálogo.', icon: PaintBucket },
+  { key: 'catalogoColorSuperficie', title: 'Tarjetas y barras', desc: 'Fondo de tarjetas, encabezado y pie.', icon: Square },
+];
+
+const CAMPOS_COLOR_TEXTO = [
+  { key: 'catalogoColorTexto', preview: 'titulo', title: 'Títulos', desc: 'Encabezados y títulos de sección.', icon: Type, sample: 'Productos destacados' },
+  { key: 'catalogoColorProducto', preview: 'producto', title: 'Título del producto', desc: 'Nombre de cada producto.', icon: ALargeSmall, sample: 'Yerba mate 1 kg' },
+  { key: 'catalogoColorSubtitulo', preview: 'subtitulo', title: 'Subtítulos y datos', desc: 'Textos secundarios y unidades.', icon: Type, sample: 'Categoría · 500 g' },
+  { key: 'catalogoColorDescripcion', preview: 'descripcion', title: 'Descripción', desc: 'Detalle de cada producto.', icon: AlignLeft, sample: 'Producto de ejemplo con descripción.' },
+  { key: 'catalogoColorCategoria', preview: 'categoria', title: 'Categoría', desc: 'Etiqueta de categoría en las tarjetas.', icon: Tag, sample: 'ALMACÉN' },
+  { key: 'catalogoColorPrecio', preview: 'precio', title: 'Precio', desc: 'Importes en tarjetas y carrito.', icon: BadgeDollarSign, sample: '$ 1.250' },
+];
+
+const CAMPOS_COLOR = [...CAMPOS_COLOR_BASE, ...CAMPOS_COLOR_TEXTO];
+
+const PALETAS_PRESET = [
+  {
+    nombre: 'Naranja',
+    colores: {
+      catalogoColorAcento: '#f97316', catalogoColorFondo: '#0f0f0f', catalogoColorSuperficie: '#1a1a1a',
+      catalogoColorTexto: '#ffffff', catalogoColorProducto: '#ffffff', catalogoColorSubtitulo: '#a3a3a3',
+      catalogoColorDescripcion: '#a3a3a3', catalogoColorCategoria: '#a3a3a3', catalogoColorPrecio: '#ffffff',
+    },
+  },
+  {
+    nombre: 'Verde',
+    colores: {
+      catalogoColorAcento: '#22c55e', catalogoColorFondo: '#0a1410', catalogoColorSuperficie: '#12201a',
+      catalogoColorTexto: '#ffffff', catalogoColorProducto: '#ffffff', catalogoColorSubtitulo: '#9fb8aa',
+      catalogoColorDescripcion: '#9fb8aa', catalogoColorCategoria: '#9fb8aa', catalogoColorPrecio: '#ffffff',
+    },
+  },
+  {
+    nombre: 'Azul',
+    colores: {
+      catalogoColorAcento: '#3b82f6', catalogoColorFondo: '#0b1220', catalogoColorSuperficie: '#141d2e',
+      catalogoColorTexto: '#ffffff', catalogoColorProducto: '#ffffff', catalogoColorSubtitulo: '#9fb0cf',
+      catalogoColorDescripcion: '#9fb0cf', catalogoColorCategoria: '#9fb0cf', catalogoColorPrecio: '#ffffff',
+    },
+  },
+  {
+    nombre: 'Rojo',
+    colores: {
+      catalogoColorAcento: '#ef4444', catalogoColorFondo: '#140b0b', catalogoColorSuperficie: '#221313',
+      catalogoColorTexto: '#ffffff', catalogoColorProducto: '#ffffff', catalogoColorSubtitulo: '#c9a8a8',
+      catalogoColorDescripcion: '#c9a8a8', catalogoColorCategoria: '#c9a8a8', catalogoColorPrecio: '#ffffff',
+    },
+  },
+  {
+    nombre: 'Claro',
+    colores: {
+      catalogoColorAcento: '#0f3b2e', catalogoColorFondo: '#f7f5f0', catalogoColorSuperficie: '#ffffff',
+      catalogoColorTexto: '#12211b', catalogoColorProducto: '#12211b', catalogoColorSubtitulo: '#57655d',
+      catalogoColorDescripcion: '#57655d', catalogoColorCategoria: '#57655d', catalogoColorPrecio: '#0f3b2e',
+    },
+  },
+];
+
 const CAMPOS_META = [
   { key: 'metaFacturacionDiaria', title: 'Meta de facturación diaria', desc: 'Objetivo de $ vendidos por día (barra del Dashboard).', icon: Target, gradient: 'from-primary to-primaryDark', type: 'currency' },
   { key: 'metaGananciaDiaria', title: 'Meta de ganancia diaria', desc: 'Objetivo de ganancia ($) por día.', icon: Wallet, gradient: 'from-violet-500 to-purple-700', type: 'currency' },
@@ -36,7 +110,7 @@ const CAMPOS_META = [
 ];
 
 const CAMPOS_TIENDA = [
-  { key: 'nombreTienda', title: 'Nombre de la tienda', desc: 'Se muestra en el encabezado, el pie y los tickets del catálogo.', icon: Store },
+  { key: 'nombreTienda', title: 'Nombre del comercio', desc: 'Se muestra como subtítulo en la barra lateral del sistema y en el encabezado, el pie y los tickets del catálogo.', icon: Store },
   { key: 'catalogoTitulo', title: 'Título del catálogo', desc: 'Título del banner principal de la tienda online.', icon: Type },
   { key: 'catalogoSubtitulo', title: 'Descripción del catálogo', desc: 'Texto informativo que aparece en el pie del catálogo.', icon: Type },
   { key: 'catalogoTextoEnvio', title: 'Texto de envíos', desc: 'Beneficio de envíos que se muestra en la tira de beneficios.', icon: Type },
@@ -82,6 +156,7 @@ const METODOS_PAGO = [
 const SECCIONES = [
   { id: 'metas', label: 'Metas y parámetros', icon: Target },
   { id: 'tienda', label: 'Tienda y catálogo', icon: Store },
+  { id: 'colores', label: 'Paleta del catálogo', icon: Palette },
   { id: 'footer', label: 'Footer del catálogo', icon: PanelBottom },
   { id: 'impuestos', label: 'Impuestos por medio de pago', icon: Percent },
   { id: 'apariencia', label: 'Apariencia', icon: ALargeSmall },
@@ -106,6 +181,7 @@ const Configuracion = () => {
 
   const [metas, setMetas] = useState(METAS_INICIALES);
   const [tienda, setTienda] = useState(TIENDA_INICIAL);
+  const [colores, setColores] = useState(COLORES_INICIALES);
   const [footer, setFooter] = useState(FOOTER_INICIAL);
   const [impuestos, setImpuestos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -132,6 +208,7 @@ const Configuracion = () => {
         if (!c) return;
         setMetas({ ...METAS_INICIALES, ...pick(c, Object.keys(METAS_INICIALES)) });
         setTienda({ ...TIENDA_INICIAL, ...pick(c, Object.keys(TIENDA_INICIAL)) });
+        setColores({ ...COLORES_INICIALES, ...pick(c, Object.keys(COLORES_INICIALES)) });
         setFooter({ ...FOOTER_INICIAL, ...pick(c, Object.keys(FOOTER_INICIAL)) });
         setImpuestos(Array.isArray(c.impuestos) ? c.impuestos : []);
       })
@@ -173,6 +250,55 @@ const Configuracion = () => {
       toast.success('Datos de la tienda guardados');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error al guardar la tienda');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateColor = (key, value) => {
+    setColores((c) => ({ ...c, [key]: value }));
+  };
+
+  const superficieAlt = mix(colores.catalogoColorSuperficie, colores.catalogoColorFondo, 0.28);
+  const fondosCatalogo = [colores.catalogoColorSuperficie, superficieAlt];
+  const rolInfo = (key, min = 4.5) => {
+    const color = ensureOn(colores[key], fondosCatalogo, min);
+    const ratio = Math.min(
+      contrastRatio(color, colores.catalogoColorSuperficie),
+      contrastRatio(color, superficieAlt),
+    );
+    return {
+      color,
+      ratio,
+      ajustado: normalizeHex(color) !== normalizeHex(colores[key]),
+    };
+  };
+  const preview = {
+    titulo: rolInfo('catalogoColorTexto'),
+    producto: rolInfo('catalogoColorProducto'),
+    subtitulo: rolInfo('catalogoColorSubtitulo', 4),
+    descripcion: rolInfo('catalogoColorDescripcion', 4),
+    categoria: rolInfo('catalogoColorCategoria', 4),
+    precio: rolInfo('catalogoColorPrecio'),
+  };
+
+  const saveColores = async () => {
+    for (const c of CAMPOS_COLOR) {
+      if (!isHexColor(colores[c.key])) {
+        return toast.error(`"${c.title}" debe ser un color hexadecimal válido (#RRGGBB)`);
+      }
+    }
+    setSaving(true);
+    try {
+      const payload = CAMPOS_COLOR.reduce((acc, c) => {
+        acc[c.key] = normalizeHex(colores[c.key]);
+        return acc;
+      }, {});
+      const { data } = await api.put('/system-config', payload);
+      if (data.config) setColores({ ...COLORES_INICIALES, ...pick(data.config, Object.keys(COLORES_INICIALES)) });
+      toast.success('Paleta del catálogo guardada');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Error al guardar la paleta');
     } finally {
       setSaving(false);
     }
@@ -362,6 +488,254 @@ const Configuracion = () => {
             {saving ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
             Guardar tienda
           </button>
+        </>
+      )}
+
+      {/* ─── SECCIÓN: Paleta del catálogo ─── */}
+      {seccion === 'colores' && (
+        <>
+          <div className="flex items-start gap-3 bg-primary/10 border border-primary/20 rounded-xl px-4 py-3 text-xs text-textMuted">
+            <Palette size={16} className="text-primary shrink-0 mt-0.5" />
+            <p>Personalizá los colores de la tienda online (/catalogo). Cada tipo de texto tiene su propio color y, si no se lee bien sobre el fondo, se corrige automáticamente para garantizar contraste.</p>
+          </div>
+
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-textMuted mb-3">Paletas rápidas</p>
+            <div className="flex flex-wrap gap-2">
+              {PALETAS_PRESET.map((p) => {
+                const activa = CAMPOS_COLOR.every((c) => normalizeHex(colores[c.key]) === p.colores[c.key]);
+                return (
+                  <button
+                    key={p.nombre}
+                    type="button"
+                    onClick={() => setColores({ ...p.colores })}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${
+                      activa
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-stone-700 text-textMuted hover:border-stone-500 hover:text-textLight'
+                    }`}
+                  >
+                    <span className="flex -space-x-1">
+                      <span className="w-4 h-4 rounded-full border border-black/20" style={{ backgroundColor: p.colores.catalogoColorAcento }} />
+                      <span className="w-4 h-4 rounded-full border border-black/20" style={{ backgroundColor: p.colores.catalogoColorSuperficie }} />
+                      <span className="w-4 h-4 rounded-full border border-black/20" style={{ backgroundColor: p.colores.catalogoColorFondo }} />
+                    </span>
+                    {p.nombre}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-textMuted mb-3">Colores base</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {CAMPOS_COLOR_BASE.map((campo) => {
+                const Icon = campo.icon;
+                const valor = colores[campo.key] || '';
+                const valido = isHexColor(valor);
+                return (
+                  <div key={campo.key} className="bg-surface rounded-2xl border border-stone-800/80 p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center">
+                        <Icon size={16} className="text-white" />
+                      </div>
+                      <p className="font-bold text-textLight text-sm">{campo.title}</p>
+                    </div>
+                    <p className="text-xs text-textMuted mb-3">{campo.desc}</p>
+                    <div className="flex items-center gap-3">
+                      <label
+                        className="relative w-12 h-12 rounded-xl overflow-hidden border border-stone-700 cursor-pointer shrink-0"
+                        style={{ backgroundColor: valido ? valor : '#000000' }}
+                        title="Elegir color"
+                      >
+                        <input
+                          type="color"
+                          value={valido ? valor : '#000000'}
+                          onChange={(e) => updateColor(campo.key, e.target.value)}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                      </label>
+                      <input
+                        type="text"
+                        value={valor}
+                        maxLength={7}
+                        spellCheck={false}
+                        onChange={(e) => updateColor(campo.key, e.target.value)}
+                        onBlur={(e) => {
+                          const norm = normalizeHex(e.target.value);
+                          if (norm) updateColor(campo.key, norm);
+                        }}
+                        placeholder="#000000"
+                        className={`flex-1 bg-background border rounded-xl px-4 py-3 font-mono text-sm text-textLight uppercase focus:outline-none ${
+                          valido ? 'border-stone-700 focus:border-primary' : 'border-red-500/60 focus:border-red-500'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-textMuted mb-1">Textos y ejemplos</p>
+            <p className="text-xs text-textMuted mb-3">Cada rol tiene su color. La muestra se ve sobre el color de tus tarjetas y el contraste se ajusta solo.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {CAMPOS_COLOR_TEXTO.map((campo) => {
+                const Icon = campo.icon;
+                const valor = colores[campo.key] || '';
+                const valido = isHexColor(valor);
+                const info = preview[campo.preview];
+                return (
+                  <div key={campo.key} className="bg-surface rounded-2xl border border-stone-800/80 p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-9 h-9 rounded-xl bg-stone-800 flex items-center justify-center shrink-0">
+                        <Icon size={16} className="text-textLight" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-textLight text-sm truncate">{campo.title}</p>
+                        <p className="text-[11px] text-textMuted truncate">{campo.desc}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <label
+                        className="relative w-12 h-12 rounded-xl overflow-hidden border border-stone-700 cursor-pointer shrink-0"
+                        style={{ backgroundColor: valido ? valor : '#000000' }}
+                        title="Elegir color"
+                      >
+                        <input
+                          type="color"
+                          value={valido ? valor : '#000000'}
+                          onChange={(e) => updateColor(campo.key, e.target.value)}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                      </label>
+                      <input
+                        type="text"
+                        value={valor}
+                        maxLength={7}
+                        spellCheck={false}
+                        onChange={(e) => updateColor(campo.key, e.target.value)}
+                        onBlur={(e) => {
+                          const norm = normalizeHex(e.target.value);
+                          if (norm) updateColor(campo.key, norm);
+                        }}
+                        placeholder="#000000"
+                        className={`flex-1 bg-background border rounded-xl px-3 py-3 font-mono text-sm text-textLight uppercase focus:outline-none ${
+                          valido ? 'border-stone-700 focus:border-primary' : 'border-red-500/60 focus:border-red-500'
+                        }`}
+                      />
+                    </div>
+                    <div
+                      className="mt-3 rounded-xl border px-3 py-2"
+                      style={{ backgroundColor: colores.catalogoColorSuperficie, borderColor: `${info.color}33` }}
+                    >
+                      <p className="text-[10px] uppercase tracking-widest mb-0.5" style={{ color: info.color }}>{campo.title}</p>
+                      <p className="text-sm font-semibold truncate" style={{ color: info.color }}>{campo.sample}</p>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 mt-2">
+                      <span className="text-[10px] font-medium" style={{ color: info.color }}>
+                        Contraste {info.ratio.toFixed(1)}:1
+                      </span>
+                      {info.ajustado ? (
+                        <span className="text-[10px] font-semibold text-amber-500">Ajustado automáticamente</span>
+                      ) : (
+                        <span className="text-[10px] font-semibold text-emerald-500">Se lee bien</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-stone-800/80 p-5" style={{ backgroundColor: colores.catalogoColorFondo }}>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: preview.titulo.color }}>Vista previa en vivo</p>
+              <span className="text-[10px]" style={{ color: preview.subtitulo.color }}>Los textos se ajustan solos para poder leerse</span>
+            </div>
+            <div
+              className="rounded-xl p-4 sm:p-5 border"
+              style={{ backgroundColor: colores.catalogoColorSuperficie, borderColor: `${preview.titulo.color}22` }}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <span className="w-10 h-10 rounded-xl shrink-0" style={{ backgroundColor: colores.catalogoColorAcento }} />
+                <div>
+                  <p className="text-base font-bold" style={{ color: preview.titulo.color }}>Mi comercio</p>
+                  <p className="text-xs" style={{ color: preview.subtitulo.color }}>Catálogo online</p>
+                </div>
+              </div>
+
+              <p className="text-[11px] font-bold uppercase tracking-widest mb-2" style={{ color: preview.titulo.color }}>
+                Productos destacados
+              </p>
+
+              <div
+                className="rounded-xl border p-4"
+                style={{ backgroundColor: colores.catalogoColorSuperficie, borderColor: `${preview.titulo.color}22` }}
+              >
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: colores.catalogoColorAcento }} />
+                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: preview.categoria.color }}>ALMACÉN</span>
+                </div>
+                <p className="text-sm font-semibold" style={{ color: preview.producto.color }}>Yerba mate 1 kg</p>
+                <p className="text-xs mt-1" style={{ color: preview.descripcion.color }}>
+                  Producto de ejemplo con descripción para ver cómo se lee.
+                </p>
+                <p className="text-[11px] mt-1" style={{ color: preview.subtitulo.color }}>por unidad · stock disponible</p>
+                <div className="flex items-center justify-between gap-3 mt-3">
+                  <p className="text-lg font-bold" style={{ color: preview.precio.color }}>$ 1.250</p>
+                  <button
+                    type="button"
+                    className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold"
+                    style={{ backgroundColor: colores.catalogoColorAcento, color: contrastText(colores.catalogoColorAcento) }}
+                  >
+                    Agregar
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                {[
+                  ['Títulos', preview.titulo.color],
+                  ['Producto', preview.producto.color],
+                  ['Subtítulo', preview.subtitulo.color],
+                  ['Descripción', preview.descripcion.color],
+                  ['Categoría', preview.categoria.color],
+                  ['Precio', preview.precio.color],
+                ].map(([label, color]) => (
+                  <span
+                    key={label}
+                    className="inline-flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-md border"
+                    style={{ borderColor: `${color}33`, color }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={saveColores}
+              disabled={saving}
+              className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all w-fit"
+            >
+              {saving ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
+              Guardar paleta
+            </button>
+            <button
+              onClick={() => setColores(COLORES_INICIALES)}
+              type="button"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-stone-700 text-textMuted hover:text-textLight hover:border-stone-500 text-sm font-medium transition-colors"
+            >
+              <RefreshCw size={15} />
+              Restablecer
+            </button>
+          </div>
         </>
       )}
 

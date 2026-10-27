@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import JsBarcode from 'jsbarcode';
+import QRCode from 'qrcode';
 
 const fmt = (v) => new Intl.NumberFormat('es-AR', {
   style: 'currency',
@@ -28,8 +29,24 @@ const barcodeDataUrl = (value) => {
   }
 };
 
+// Renderiza un QR a PNG (dataURL). Devuelve null si falla.
+const qrDataUrl = async (value) => {
+  try {
+    if (!value) return null;
+    return await QRCode.toDataURL(String(value), {
+      errorCorrectionLevel: 'M',
+      margin: 0,
+      width: 256,
+      color: { dark: '#000000', light: '#ffffff' },
+    });
+  } catch {
+    return null;
+  }
+};
+
 // Dibuja una etiqueta de precio dentro del rectángulo (x, y, w, h) en mm.
-const drawLabel = (doc, p, x, y, w, h, storeName) => {
+const drawLabel = (doc, p, x, y, w, h, storeName, opts = {}) => {
+  const { includeBarcode = true, qrImage = null } = opts;
   const pad = 2.5;
   const innerW = w - pad * 2;
 
@@ -53,11 +70,12 @@ const drawLabel = (doc, p, x, y, w, h, storeName) => {
 
   const fraccionado = !!p.esFraccionado
     && ((Number(p.precioFraccionado) || 0) > 0 || (Number(p.precioBolsaCerrada) || 0) > 0);
-  const tieneBarcode = !!p.codigoBarras;
-  // Reservamos la franja inferior: código de barras (si hay) + texto del código.
-  const bottomStart = y + h - (tieneBarcode ? 11 : 5.5);
+  const tieneBarcode = includeBarcode && !!p.codigoBarras;
+  const tieneQr = !!qrImage;
+  const bandaInferior = (tieneBarcode || tieneQr) ? 13 : (includeBarcode ? 5.5 : 0);
+  const bottomStart = y + h - bandaInferior;
 
-  // Zona del precio: desde debajo del nombre hasta el comienzo del código de barras.
+  // Zona del precio: desde debajo del nombre hasta el comienzo del código/QR.
   const priceTop = nombreBottom + 1.5;
   const priceCenterY = (priceTop + bottomStart) / 2;
 
@@ -87,44 +105,89 @@ const drawLabel = (doc, p, x, y, w, h, storeName) => {
     doc.text(fmt(p.precioVenta), x + w / 2, priceCenterY + 2.2, { align: 'center' });
   }
 
-  // Código de barras / SKU
+  // QR a la derecha de la franja inferior (si está habilitado).
+  const qrSize = 11;
+  const qrGap = 1.5;
+  const qrX = x + w - pad - qrSize;
+  const qrY = y + h - qrSize - 1.3;
+  if (tieneQr) {
+    try {
+      doc.addImage(qrImage, 'PNG', qrX, qrY, qrSize, qrSize);
+    } catch {
+      /* si falla el QR, seguimos con el resto */
+    }
+  }
+
+  // Código de barras / SKU (a la izquierda del QR si ambos están presentes).
+  const anchoBarcode = tieneQr ? Math.max(18, innerW - qrSize - qrGap) : innerW;
   const codeY = y + h - 11;
   if (tieneBarcode) {
     const dataUrl = barcodeDataUrl(p.codigoBarras);
     if (dataUrl) {
       const bcH = 6;
-      const bcW = Math.min(innerW, 42);
+      const bcW = Math.min(anchoBarcode, 38);
       try {
-        doc.addImage(dataUrl, 'PNG', x + (w - bcW) / 2, codeY, bcW, bcH);
+        doc.addImage(dataUrl, 'PNG', x + pad + (anchoBarcode - bcW) / 2, codeY, bcW, bcH);
       } catch {
         /* si falla el barcode, seguimos con el texto */
       }
     }
   }
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(5);
-  doc.setTextColor(90);
-  doc.text(String(p.codigoBarras || p.sku || ''), x + w / 2, y + h - 1.4, {
-    align: 'center',
-    maxWidth: innerW,
-  });
+  if (includeBarcode) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(5);
+    doc.setTextColor(90);
+    const codeText = String(p.codigoBarras || p.sku || '');
+    const textX = tieneQr ? x + pad + anchoBarcode / 2 : x + w / 2;
+    doc.text(codeText, textX, y + h - 1.4, {
+      align: 'center',
+      maxWidth: anchoBarcode,
+    });
+  } else if (tieneQr) {
+    // Sin código de barras: mensaje para el cliente junto al QR.
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(5.5);
+    doc.setTextColor(90);
+    const mensaje = doc.splitTextToSize('Escaneá para ver el precio actualizado', Math.max(20, innerW - qrSize - qrGap));
+    doc.text(mensaje.slice(0, 2), x + pad, y + h - 6.5);
+  }
 };
 
 /**
- * Genera un PDF A4 con etiquetas de precio de todos los productos.
+ * Genera un PDF A4 con etiquetas de precio.
  * - Grilla de 3 columnas x 8 filas (24 etiquetas por hoja).
- * - Los productos con `esFraccionado` muestran precio fraccionado y bolsa cerrada.
- * - Si el producto tiene `codigoBarras`, se imprime el código Code128.
+ * - Los productos fraccionados muestran precio fraccionado y bolsa cerrada.
+ * - `includeBarcode` imprime el Code128 (si el producto tiene código).
+ * - `includeQr` imprime un QR que abre la ficha pública del producto con el precio vigente.
  *
- * @param {{ products: object[], storeName?: string, copies?: number }} opts
- * @returns {Promise<{ total: number, productos: number }>}
+ * @param {{ products: object[], storeName?: string, copies?: number,
+ *          includeBarcode?: boolean, includeQr?: boolean, publicBaseUrl?: string }} opts
+ * @returns {Promise<{ total: number, productos: number, conQr: number }>}
  */
-export const generateProductLabelsPdf = async ({ products = [], storeName = 'MiniMarket', copies = 1 } = {}) => {
+export const generateProductLabelsPdf = async ({
+  products = [],
+  storeName = 'MiniMarket',
+  copies = 1,
+  includeBarcode = true,
+  includeQr = true,
+  publicBaseUrl = '',
+} = {}) => {
   const lista = products.filter((p) => p.activo !== false && !p.esCombo);
   if (!lista.length) throw new Error('No hay productos activos para generar etiquetas');
 
   const nCopias = Math.max(1, Math.min(50, Number(copies) || 1));
+  const base = String(publicBaseUrl || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/+$/, '');
+
+  // Pre-generar un QR por producto (cacheado por id) antes de dibujar.
+  const qrCache = new Map();
+  if (includeQr && base) {
+    const unicos = [...new Set(lista.map((p) => String(p._id || '')).filter(Boolean))];
+    await Promise.all(unicos.map(async (id) => {
+      const img = await qrDataUrl(`${base}/p/${id}`);
+      if (img) qrCache.set(id, img);
+    }));
+  }
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
 
@@ -153,11 +216,14 @@ export const generateProductLabelsPdf = async ({ products = [], storeName = 'Min
     const row = Math.floor(slot / cols);
     const x = marginX + col * cellW + 1;
     const y = marginY + row * cellH + 1;
-    drawLabel(doc, p, x, y, labelW, labelH, storeName);
+    drawLabel(doc, p, x, y, labelW, labelH, storeName, {
+      includeBarcode,
+      qrImage: includeQr ? qrCache.get(String(p._id || '')) : null,
+    });
   });
 
   const fecha = new Date().toISOString().slice(0, 10);
   doc.save(`Etiquetas-Precios-${fecha}.pdf`);
 
-  return { total: etiquetas.length, productos: lista.length };
+  return { total: etiquetas.length, productos: lista.length, conQr: qrCache.size };
 };
